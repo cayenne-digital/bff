@@ -44,12 +44,6 @@ class Bff {
     return hash_hmac('sha256', $string, $hash_key);
   }
 
-  /*
-   * FIXME:
-   * ===================
-   * do this properly ;P
-   * ===================
-   */
   public function getDbConnection() {
 
     if (!$this->database) return false;
