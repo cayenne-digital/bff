@@ -7,7 +7,7 @@
  * Licensed under The MIT License
  * Redistributions of files must retain the above copyright notice.
  *
- * @version 0.2.0
+ * @version 0.2.1
  * @copyright Copyright 2012, Cayenne Digital (http://www.cayenne.it)
  * @link https://github.com/cayenne-digital/bff
  * @author Francesco Negri <francesco.negri@cayenne.it>
@@ -153,7 +153,7 @@ class Bff {
 
   public function text($name, $options=Array()) {
     $i = $this->input($name, $options);
-    $html = "<label {$i['title']} {$i['error_class']}'>{$i['label']}</label>\n";
+    $html = "<label {$i['title']} {$i['error_class']}>{$i['label']}</label>\n";
     $html .= "<span class='description'>{$i['description']}</span>\n";
     $html .= "<input name='$name' type='text' value='{$i['value']}' {$i['class']}></input>\n";
     return $html;
