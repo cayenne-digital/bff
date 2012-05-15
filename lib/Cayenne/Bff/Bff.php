@@ -1,14 +1,13 @@
 <?php
 /**
- * Bff: Better form factory, Build that effing form, Bright fancy forms...
- *      It doesn't matter, it's your BFF!
+ * Bff: Best Forms Forever
  *
  * Copyright 2012, Cayenne Digital (http://www.cayenne.it)
  *
  * Licensed under The MIT License
  * Redistributions of files must retain the above copyright notice.
  *
- * @version 0.1.0
+ * @version 0.2.0
  * @copyright Copyright 2012, Cayenne Digital (http://www.cayenne.it)
  * @link https://github.com/cayenne-digital/bff
  * @author Francesco Negri <francesco.negri@cayenne.it>
@@ -16,6 +15,8 @@
  */
 
 namespace Cayenne\Bff;
+
+use PDO;
 
 class Bff {
 
@@ -27,10 +28,11 @@ class Bff {
   private $display_result = false;
 
   private $fields = Array();
+  private $labels = Array();
   private $required = Array();
   private $validations = Array();
   private $errors = Array();
-
+  private $exception;
 
   public function __construct($config=Array()) {
     // Not very secure but we'll fix this another time
@@ -96,41 +98,71 @@ class Bff {
     return $html;
   }
 
-  public function errorMessage() {
-    $html = '';
+  public function errorList() {
+    $messages = Array();
+    $html = "";
     if (count($this->errors)>0) {
+      $fields = Array();
+      foreach ($this->errors as $f => $e) {
+        $fields[] = $this->labelize($f);
+      }
+      $messages[] = "Controlla i seguenti campi: " . implode (", ", $fields);
+    }
+    if ($this->exception) {
+      $messages[] = "Errore: " . $this->exception;
+    }
+    if (count($messages)>0) {
       $html = "<div class='bff-errors'>";
-      $html .= "<p class='error'>Controlla che tutti i campi obbligatori siano compilati</p>";
+      foreach ($messages as $m) {
+        $html .= "<p class='error-list'>$m</p>";
+      }
       $html .= "</div>";
     }
   return $html;
   }
 
-  public function input($name, $label=null, $options=Array()) {
+  /*
+   * Common processing for all input types
+   */
+  private function input($name, $options=Array()) {
     array_push($this->fields, $name);
-    // $class = (array_key_exists($name, $this->errors)) ? 'error ' : '';
-    $class = (isset($options['class'])) ? $options['class'] : '';
-    $error = (array_key_exists($name, $this->errors)) ? 'error' : '';
-    if ($class) $class = " class='$class'";
-    $value = (isset($this->data[$name])) ? $this->data[$name] : '';
 
-    if (!$label) $label = ucwords(str_replace('_',' ',$name));
-    if (in_array($name,$this->required)) $label .= "*";
-    $html = "<label class='$error'>$label</label>\n";
+    $i = Array();
 
-    $html .= "<input name='$name' type='text' value='$value' $class></input>\n";
+    $i['class'] = (isset($options['class'])) ? $options['class'] : '';
+    if (!empty($i['class'])) $i['class'] = " class='{$i['class']}'";
+
+    if (empty($this->errors[$name])) {
+      $i['title'] = "";
+      $i['error_class'] = "";
+      $i['error'] = "";
+    } else {
+      $i['title'] = "title='{$this->errors[$name]}'";
+      $i['error_class'] = "class='error'";
+      $i['error'] = "error";
+    }
+
+    $i['value'] = (isset($this->data[$name])) ? $this->data[$name] : '';
+
+    $i['label'] = $this->labelize($name);
+    // if (isset($options['description'])) $i['label'] .= " {$options['description']}";
+    $i['description'] = (empty($options['description']))?"":$options['description'];
+
+    return $i;
+  }
+
+  public function text($name, $options=Array()) {
+    $i = $this->input($name, $options);
+    $html = "<label {$i['title']} {$i['error_class']}'>{$i['label']}</label>\n";
+    $html .= "<span class='description'>{$i['description']}</span>\n";
+    $html .= "<input name='$name' type='text' value='{$i['value']}' {$i['class']}></input>\n";
     return $html;
   }
 
-  public function select($name, $label=null, $values, $options=Array()) {
-    array_push($this->fields, $name);
-    $error = (array_key_exists($name, $this->errors)) ? 'error' : '';
-
-    if (!$label) $label = ucwords(str_replace('_',' ',$name));
-    if (in_array($name,$this->required)) $label .= "*";
-    $html = "<label class='$error'>$label</label>\n";
-
-    // $html .= "<div class='$error'>\n";
+  public function select($name, $values, $options=Array()) {
+    $i = $this->input($name, $options);
+    $html = "<label {$i['title']} {$i['error_class']}>{$i['label']}</label>\n";
+    $html .= "<span class='description'>{$i['description']}</span>\n";
     $html .= "<select name='$name'>\n";
     $html .= "<option value=''>Seleziona...</option>\n";
     $value = (isset($this->data[$name])) ? $this->data[$name] : '';
@@ -140,37 +172,25 @@ class Bff {
       $html .= "<option value='$v' $selected>$v</option>\n";
     }
     $html .= "</select>";
-    // $html .= "</div>";
 
     return $html;
   }
 
-  public function textarea($name, $label=null) {
-    array_push($this->fields, $name);
-    $error = (array_key_exists($name, $this->errors)) ? 'error' : '';
-    $value = (isset($this->data[$name])) ? $this->data[$name] : '';
-
-    if (!$label) $label = ucwords(str_replace('_',' ',$name));
-    if (in_array($name,$this->required)) $label .= "*";
-    // $html = "<div class='$error'>\n";
-    $html = "<label class='$error'>$label</label>\n";
-    $html .= "<textarea name='$name'>$value</textarea>\n";
-    // $html .= "</div>\n";
+  public function textarea($name, $options=Array()) {
+    $i = $this->input($name, $options);
+    $html = "<label {$i['title']} {$i['error_class']}'>{$i['label']}</label>\n";
+    $html .= "<span class='description'>{$i['description']}</span>\n";
+    $html .= "<textarea name='$name'>{$i['value']}</textarea>\n";
     return $html;
   }
 
-  public function checkbox($name, $label=null) {
-    array_push($this->fields, $name);
-    $error = (array_key_exists($name, $this->errors)) ? 'error' : '';
-    $value = (isset($this->data[$name])) ? "checked='checked'" : '';
+  public function checkbox($name, $options=Array()) {
+    $i = $this->input($name, $options);
+    $html = "<input id='id_$name' name='$name' type='checkbox' {$i['value']} value='1'
+              class='inline'></input>\n";
+    $html .= "<label for='id_$name' class='inline ${i['error']}' {$i['title']}>{$i['label']}</label>\n";
+    $html .= "<span class='description'>{$i['description']}</span>\n";
 
-    if (!$label) $label = ucwords(str_replace('_',' ',$name));
-    if (in_array($name,$this->required)) $label .= "*";
-
-    // $html = "<span class='$error'>\n";
-    $html = "<input name='$name' type='checkbox' $value value='1' class='inline'></input>\n";
-    $html .= "<label class='inline $error'>$label</label>\n";
-    // $html .= "</span>\n";
     return $html;
   }
 
@@ -186,7 +206,8 @@ class Bff {
       if (!empty($this->data[$f])) {
         switch ($v) {
         case 'email':
-          // Regexes shamelessly copied from https://github.com/cakephp/cakephp/blob/master/lib/Cake/Utility/Validation.php
+          // Regexes shamelessly copied from
+          // https://github.com/cakephp/cakephp/blob/master/lib/Cake/Utility/Validation.php
           $hostname = '(?:[a-z0-9][-a-z0-9]*\.)*(?:[a-z0-9][-a-z0-9]{0,62})\.(?:(?:[a-z]{2}\.)?[a-z]{2,4}|museum|travel)';
           $regex = '/^[a-z0-9!#$%&\'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&\'*+\/=?^_`{|}~-]+)*@' . $hostname . '$/i';
           if (!preg_match($regex, $this->data[$f])) {
@@ -216,6 +237,7 @@ class Bff {
       return true;
     } catch (Exception $e) {
       trigger_error("Bff Exception: " . $e->getMessage(), E_USER_WARNING);
+      $this->exception = $e->getMessage();
       return false;
     }
   }
@@ -282,5 +304,14 @@ class Bff {
     if (!$accepted) throw new Exception("Bff error sending email");
   }
 
+  private function labelize($name) {
+    if (empty($this->labels[$name])) {
+      $label = ucwords(str_replace('_',' ',$name));
+    } else {
+      $label = $this->labels[$name];
+    }
+    if (in_array($name,$this->required)) $label .= "*";
+    return $label;
+  }
 
 }
