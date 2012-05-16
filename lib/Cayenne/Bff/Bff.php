@@ -83,7 +83,7 @@ class Bff {
 
 
   public function formTag() {
-    return "<form class='bff' method='POST' action=''>";
+    return "<form class='bff' method='post' action=''>";
   }
 
   public function endFormTag() {
